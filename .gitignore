@@ -1,0 +1,39 @@
+# ===== Unity =====
+unity-swing/Library/
+unity-swing/Temp/
+unity-swing/Obj/
+unity-swing/Builds/
+unity-swing/Logs/
+unity-swing/UserSettings/
+unity-swing/*.csproj
+unity-swing/*.sln
+unity-swing/*.user
+unity-swing/.vs/
+unity-swing/Packages/Cesium/
+
+# Cesium for Unity は同梱サイズが大きいため OpenUPM から取得する
+# （ローカルに 568MB のパッケージを置いている場合は manifest.json を
+#   "com.cesium.unity": "file:../Packages/Cesium"
+#  に戻せばオフラインで使える）
+
+# ===== node / vite projects =====
+node_modules/
+dist/
+.vite/
+*.log
+
+# ===== OS / tools =====
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.idea/
+*.tmp
+
+# ===== opencode / agent tool configs (公開対象外) =====
+.opencode/
+ecc/
+skills/
+.claude/
+.codex/
+.cursor/

@@ -1,0 +1,20 @@
+{
+  "dependencies": {
+    "com.cesium.unity": "1.26.0",
+    "com.unity.mathematics": "1.2.6",
+    "com.unity.test-framework": "1.1.33",
+    "com.unity.ugui": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.screencapture": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0"
+  },
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [ "com.cesium.unity" ]
+    }
+  ],
+  "testables": [ "com.unity.test-framework", "com.cesium.unity" ]
+}
