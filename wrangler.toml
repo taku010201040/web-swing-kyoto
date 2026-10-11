@@ -1,0 +1,18 @@
+# Cloudflare Workers へのデプロイ設定（npm run deploy）
+name = "kyoto-ninja"
+main = "worker/index.js"
+compatibility_date = "2026-09-01"
+
+# ゲーム本体。npm run build:public が index.html と dist/game.js を public/ にそろえる
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# チームの記録を保存する Durable Object
+[[durable_objects.bindings]]
+name = "TEAMS"
+class_name = "TeamStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TeamStore"]

@@ -7,7 +7,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "esbuild src/main.js --bundle --format=iife --minify --outfile=dist/game.js",
     "serve": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:public": "node scripts/build-public.mjs",
+    "deploy": "npm run build && npm run build:public && wrangler deploy",
+    "dev:cf": "npm run build && npm run build:public && wrangler dev"
   },
   "keywords": [],
   "author": "",
@@ -24,5 +27,8 @@
   "engines": {
     "node": ">=18"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  }
 }

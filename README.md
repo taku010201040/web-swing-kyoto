@@ -4,6 +4,8 @@
 
 **京都を駆け抜けろ — 忍者鉤縄タイムアタック**
 
+▶ **今すぐ遊ぶ：https://kyoto-ninja.kyoto-ninja.workers.dev**（PC の Chrome / Edge、キーボード＋マウス）
+
 デモ動画（1分47秒・自動操縦によるプレイ）：[demo/kyoto-ninja-demo.mp4](demo/kyoto-ninja-demo.mp4)
 
 ## 概要（誰の・どんな課題を、どう解決するか）
@@ -42,23 +44,16 @@
 | PLATEAU の読み込み | 3d-tiles-renderer（3D Tiles）、@mapbox/vector-tile ＋ pbf（MVT） |
 | 当たり判定 | three-mesh-bvh |
 | ビルド | esbuild |
-| サーバー | Node.js 標準機能のみ（ゲームの配信、チーム記録 API、JSON ファイル保存） |
+| 公開先 | Cloudflare Workers（ゲームの配信＋チーム記録 API。記録は Durable Objects に保存） |
 | 開発 | Claude Code（設計・実装・検証） |
 
 ## 動かし方
 
-Node.js 18 以上が必要。
+**https://kyoto-ninja.kyoto-ninja.workers.dev** を PC の Chrome か Edge で開くだけ。インストールは不要。
 
-```bash
-npm install
-npm run build
-npm run serve
-```
-
-ブラウザで http://localhost:8123 を開く（Chrome / Edge、PC のキーボード＋マウス）。
-
-- インターネット接続が必要（建物データを PLATEAU の配信サーバーから読むため）。
-- 実写テクスチャ付きのタイルが重く、**初回の読み込みは 1〜2 分かかることがある**。2 回目以降はブラウザのキャッシュが効く。
+- 建物データは PLATEAU の配信サーバーから読み込む。実写テクスチャ付きのタイルが重く、**初回の読み込みは 1〜2 分かかることがある**（2 回目以降はブラウザのキャッシュが効く）。
+- 名前を入れて「出発する」。同じ合言葉を入れた人どうしでチームになる（空欄ならソロ）。
+- スマートフォンとゲームパッドは未対応。
 
 | 入力 | 動作 |
 | --- | --- |
@@ -69,4 +64,14 @@ npm run serve
 | V | 三人称 ⇄ 一人称 |
 | R / Enter | 直前の通過地点へ戻る / 最初からやり直す |
 
-チーム機能、インターネットへの公開方法、検証した内容、未対応の点などの詳細は [docs/details.md](docs/details.md) を参照。
+### 自分でデプロイし直す場合
+
+Node.js 18 以上と Cloudflare のアカウントが必要。
+
+```bash
+npm install
+npx wrangler login
+npm run deploy
+```
+
+チーム機能の仕様、検証した内容、未対応の点などの詳細は [docs/details.md](docs/details.md) を参照。
