@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>天空流しそうめんスライダー | KYOTO PLATEAU HACK 2026</title>
+  </head>
+  <body>
+    <div id="cesium"></div>
+    <div id="loader"><div id="loader-box"><h1>🎋 天空流しそうめんスライダー</h1><p id="loader-text">データを読み込み中…</p><div id="loader-bar"><div id="loader-fill"></div></div><button id="loader-skip" type="button">スキップして開く</button></div></div>
+    <header id="title-card">
+      <h1>🎋 天空流しそうめんスライダー</h1>
+      <p>KYOTO PLATEAU HACK 2026 / kph2026-07</p>
+      <p id="token-status">base: OSM（ion未設定）</p>
+      <div id="course-card">
+        <p id="course-name">🟢 かもがわファミリー</p>
+        <p id="course-desc">七条通まっすぐ1.4km</p>
+      </div>
+    </header>
+    <nav id="course-bar">
+      <button id="btn-course-green" type="button" class="active">🟢 ファミリー</button>
+      <button id="btn-course-red" type="button">🔴 スラローム</button>
+      <button id="btn-course-black" type="button">⚫ ブラックダイブ</button>
+    </nav>
+    <nav id="toolbar">
+      <button id="btn-station" type="button">📍 京都駅</button>
+      <button id="btn-ride" type="button">🎢 ライド</button>
+      <button id="btn-fire" type="button">🔥 火災デモ</button>
+      <button id="btn-water" type="button">💧 放水</button>
+      <button id="btn-poi" type="button" class="active">🏪 施設</button>
+      <button id="btn-br" type="button">🪂 BR</button>
+      <button id="btn-reset" type="button">↩ リセット</button>
+    </nav>
+    <div id="br-hud" style="display:none"></div>
+    <div id="br-minimap-wrap" style="display:none"><canvas id="br-minimap" width="180" height="180"></canvas></div>
+    <div id="br-hint" style="display:none"></div>
+    <div id="br-vignette"></div>
+    <div id="br-result" style="display:none">
+      <h2 id="br-result-title"></h2>
+      <p id="br-result-sub"></p>
+    </div>
+    <aside id="score-card">
+      <h2>まちの健康診断（試算）</h2>
+      <dl>
+        <div><dt>密集率</dt><dd id="v-density">—</dd></div>
+        <div><dt>延焼リスク</dt><dd id="v-risk">—</dd></div>
+        <div><dt>避難所まで</dt><dd id="v-shelter">—</dd></div>
+      </dl>
+      <p class="note">PLATEAU CityGML 2025（京都8メッシュ）実測。木造=構造601、旧耐震=1980年以前。POI: OpenPOI API (Overture Maps contributors 他)。</p>
+    </aside>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
