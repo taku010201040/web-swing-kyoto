@@ -6,7 +6,7 @@
 
 ▶ **今すぐ遊ぶ：https://kyoto-ninja.kyoto-ninja.workers.dev**（PC の Chrome / Edge、キーボード＋マウス）
 
-デモ動画（1分47秒・自動操縦によるプレイ）：[demo/kyoto-ninja-demo.mp4](demo/kyoto-ninja-demo.mp4)
+デモ動画（1分40秒・自動操縦によるプレイ）：[demo/kyoto-ninja-demo.mp4](demo/kyoto-ninja-demo.mp4)
 
 ## 概要（誰の・どんな課題を、どう解決するか）
 

@@ -5,7 +5,7 @@ KYOTO PLATEAU HACK 2026 の作品。**PLATEAU の京都市 3D 都市モデルを
 - 対象：大学生。遊びながら、京都の碁盤目・鴨川・名所の位置関係と、PLATEAU にどんなデータが入っているかが分かる。
 - コース：七条通 → 鴨川・七条大橋 → 京都駅 → 東寺五重塔 → 京都タワー（実距離のまま 約 3.6km）。
 
-デモ動画（1分47秒・自動操縦によるプレイ）：[demo/kyoto-ninja-demo.mp4](../demo/kyoto-ninja-demo.mp4)
+デモ動画（1分40秒・自動操縦によるプレイ）：[demo/kyoto-ninja-demo.mp4](../demo/kyoto-ninja-demo.mp4)
 
 ## 特徴
 
