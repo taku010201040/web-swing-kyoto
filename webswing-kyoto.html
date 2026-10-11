@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WebSwing Kyoto - PLATEAU スパイダーマン風スイング</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:system-ui,sans-serif}
+  canvas{display:block}
+  #hud{position:fixed;top:10px;left:10px;color:#fff;background:#0008;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.6;pointer-events:none;z-index:6}
+  #cross{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:22px;pointer-events:none;text-shadow:0 0 6px #000;z-index:6}
+  #cross.ok{color:#ff5555}
+  #speed{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:5;
+    background:repeating-conic-gradient(from 0deg at 50% 50%, transparent 0 2deg, rgba(255,255,255,.09) 2deg 3deg);
+    -webkit-mask-image:radial-gradient(circle, transparent 42%, black 78%);
+    mask-image:radial-gradient(circle, transparent 42%, black 78%);}
+  #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000a;z-index:10}
+  #card{background:#111;color:#fff;padding:28px;border-radius:16px;max-width:520px;text-align:center}
+  #card button{font-size:18px;padding:12px 28px;border-radius:10px;border:0;background:#00e676;cursor:pointer;font-weight:bold}
+  #card kbd{background:#333;padding:2px 6px;border-radius:4px}
+</style>
+<script type="importmap">{"imports":{
+  "three":"./libs/three.module.js",
+  "three/examples/jsm/":"./libs/three-examples/jsm/",
+  "three/addons/":"./libs/three-examples/jsm/",
+  "3d-tiles-renderer":"./libs/package/src/index.js",
+  "3d-tiles-renderer/three":"./libs/package/src/index.js"
+}}</script>
+<script>
+window.__started=false; window.__modOK=false;
+window.addEventListener('error',function(e){
+  var h=document.getElementById('hud');
+  if(h) h.innerHTML='エラー: '+(e.message||e.error)+'<br>F12コンソールの赤文字を教えてください';
+});
+window.addEventListener('DOMContentLoaded', function(){
+  function startGame(){
+    if(window.__started) return;
+    if(!window.__modOK){
+      var s=document.getElementById('loadstat');
+      if(s) s.textContent='まだ準備中…数秒待って押し直してください';
+      return;
+    }
+    document.getElementById('start').style.display='none';
+    window.__started=true;
+    var c=document.querySelector('canvas');
+    if(c && c.requestPointerLock){ try{ var r=c.requestPointerLock(); if(r&&r.catch)r.catch(function(){}); }catch(_){} }
+  }
+  document.getElementById('go').addEventListener('click', startGame);
+  document.getElementById('start').addEventListener('click', startGame);
+  window.addEventListener('keydown', function(e){
+    if(e.code==='Enter'||e.code==='Space') startGame();
+  });
+  setTimeout(function(){
+    if(!window.__modOK){
+      var ps=document.querySelectorAll('#card p');
+      var p=ps[ps.length-1];
+      if(p) p.innerHTML='<b style="color:#ffb">ライブラリ読込に失敗中… 同じフォルダの libs/ が消えていないか確認してください(F12コンソールの赤文字も参照)</b>';
+    }
+  }, 8000);
+});
+</script>
+</head>
+<body>
+<div id="hud"><span id="tp" style="color:#ffd27a">PLATEAU: 接続中…</span><br><span id="stat"></span></div>
+<div id="speed"></div>
+<div id="cross">＋</div>
+<div id="start"><div id="card">
+  <h2>🕸 WebSwing Kyoto</h2>
+  <p>PLATEAU 京都市LOD2 (四条烏丸〜京都駅) を振り子スイングで滑空しよう</p>
+  <p><b>長押し</b>(クリック/スペース/タップ)＝糸＋加速、<b>離す</b>＝ジャンプ</p>
+  <p>マウス＝視点 / <kbd>A D</kbd>＝左右 / 糸は自動でも発射<br><kbd>R</kbd>＝戻る <kbd>N</kbd>＝昼夜 <kbd>M</kbd>＝オート切替</p>
+  <p style="font-size:12px;opacity:.7">軽量モードで動作中。高品質はURL末尾に <b>?hq=1</b> を付けてください</p>
+  <button id="go">スイング開始</button>
+  <p id="loadstat" style="color:#ffb">ライブラリ読み込み中…</p>
+  <p style="font-size:12px;opacity:.7">※初回は3D Tiles取得に10〜20秒かかります。重い時はURLを下京区のみに変更</p>
+</div></div>
+<script type="module">
+import * as THREE from 'three';
+import { TilesRenderer } from '3d-tiles-renderer/three';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFCesiumRTCExtension } from './libs/package/src/three/loaders/gltf/GLTFCesiumRTCExtension.js';
+window.__modOK = true;
+{ var s=document.getElementById('loadstat'); if(s){ s.style.color='#8f8'; s.textContent='準備OK！ボタンを押してね'; } }
+
+// ===== 0. 基本セットアップ (?hq=1 で高品質 / デフォルトは軽量) =====
+const LITE = !new URLSearchParams(location.search).has('hq');
+const renderer = new THREE.WebGLRenderer({antialias:!LITE, powerPreference:'high-performance'});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, LITE?1:2));
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060a18);
+scene.fog = new THREE.Fog(0x060a18, 400, 3500);
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 1, 20000);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+function lonLatToEcef(latD, lonD, h=0){
+  const a=6378137, e2=6.69437999014e-3;
+  const lat=THREE.MathUtils.degToRad(latD), lon=THREE.MathUtils.degToRad(lonD);
+  const N=a/Math.sqrt(1-e2*Math.sin(lat)**2);
+  return new THREE.Vector3((N+h)*Math.cos(lat)*Math.cos(lon),(N+h)*Math.cos(lat)*Math.sin(lon),(N*(1-e2)+h)*Math.sin(lat));
+}
+// 四条烏丸〜京都駅エリア
+const ORIGIN = lonLatToEcef(34.994, 135.758, 0);
+const UP = ORIGIN.clone().normalize();
+camera.up.copy(UP);
+
+const hemi = new THREE.HemisphereLight(0x8fb0ff, 0x0a0c18, 0.5);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0x8fb0ff, 0.7);
+sun.position.copy(ORIGIN.clone().add(UP.clone().multiplyScalar(2000)));
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(4000,32), new THREE.MeshStandardMaterial({color:0x14171e, roughness:1}));
+ground.position.copy(ORIGIN);
+ground.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), UP);
+scene.add(ground);
+
+// ===== 1. PLATEAU 3D Tiles (localhost経由で中継: 下京区=京都駅 / 中京区=四条烏丸) =====
+const WARD_URLS = [
+  '/cms/assets/f0/2ed501-5480-4ccb-8293-9469a3856f9a/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26106_shimogyo-ku_lod2/tileset.json',
+  '/cms/assets/04/eaac56-936e-49e2-a91b-0db31a6ed192/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26104_nakagyo-ku_lod2/tileset.json'
+];
+const wardUrls = new URLSearchParams(location.search).has('ward') ? [WARD_URLS[0]] : WARD_URLS;
+let tilesReady = false, fallbackDone = false, tileCount = 0;
+function tpMsg(s){ const el=document.getElementById('tp'); if(el) el.textContent=s; }
+// PLATEAU 2025 LOD2はDraco圧縮 → デコーダを登録
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('./libs/draco/');
+const tilesList = wardUrls.map(u=>{
+  const t = new TilesRenderer(u);
+  // 軽量化: タイル詳細度を下げ・兄弟タイルを読まない
+  t.errorTarget = LITE ? 26 : 6;
+  t.errorThreshold = LITE ? 26 : 16;
+  t.loadSiblings = false;
+  t.optimizeRaycast = true;
+  const ldr = (()=>{
+    // PLATEAU b3dm は Draco + CESIUM_RTC のため、両方対応したGLTFLoaderを注入
+    const l = t.manager.getHandler(/\.gltf$/) || new GLTFLoader();
+    l.setDRACOLoader(dracoLoader);
+    l.register(()=>new GLTFCesiumRTCExtension());
+    return l;
+  })();
+  t.manager.addHandler(/\.gltf$/, ldr);
+  function onLoaded(){
+    if(tilesReady) return;
+    tilesReady = true; tileCount++;
+    tpMsg(`PLATEAU LOD2: 京都の建物 取得OK (${tileCount}件)`);
+  }
+  t.setCamera(camera);
+  t.setResolutionFromRenderer(camera, renderer);
+  scene.add(t.group);
+  t.addEventListener('load-model', onLoaded);
+  t.addEventListener('load-content', onLoaded);
+  t.addEventListener('load-tile-set', ()=>tpMsg('PLATEAU: タイル設定取得'));
+  return t;
+});
+function ensureFallback(msg){
+  if(fallbackDone || tilesReady) return;
+  fallbackDone = true; buildFallbackCity();
+  document.getElementById('stat').textContent = msg || '(フォールバック街でプレイ中)';
+  if(msg) tpMsg('PLATEAU: 未取得 ' + msg);
+}
+// 12秒経っても来なければダミービルで遊べるようにする
+setTimeout(()=>ensureFallback('(フォールバック街でプレイ中)'), 12000);
+// 建物の実体はstatsで判定する(イベントが来ない環境向け)
+setInterval(()=>{
+  for(const t of tilesList){
+    const s=t.stats; if(!s) continue;
+    const vis=s.visible!==undefined?s.visible:s.used;
+    if(vis>0 && !tilesReady){
+      tilesReady=true; tileCount++;
+      tpMsg(`PLATEAU LOD2: 京都の建物 取得OK (${vis}件表示)`);
+    } else if(!tilesReady && (s.failed>0||s.downloading===0&&s.parsing===0&&s.used===0)){
+      tpMsg('PLATEAU: 建物0件 (別途調査)');
+    }
+  }
+}, 1000);
+
+function buildFallbackCity(){
+  const mat=facadeMat();
+  const box=new THREE.BoxGeometry(1,1,1);
+  const im=new THREE.InstancedMesh(box,mat,LITE?70:120);
+  const east=new THREE.Vector3().crossVectors(new THREE.Vector3(0,0,1),UP).normalize();
+  const north=new THREE.Vector3().crossVectors(UP,east).normalize();
+  const mtx=new THREE.Matrix4(), q=new THREE.Quaternion(), scl=new THREE.Vector3(), pos=new THREE.Vector3();
+  for(let i=0;i<im.count;i++){
+    const w=15+Math.random()*25, h=20+Math.random()*80, d=15+Math.random()*25;
+    const along=(i-im.count/2)*45, side=(Math.random()<0.5?-1:1)*(60+Math.random()*120);
+    pos.copy(ORIGIN).addScaledVector(east,side).addScaledVector(north,along).addScaledVector(UP,h/2);
+    scl.set(w,h,d);
+    mtx.compose(pos,q,scl);
+    im.setMatrixAt(i,mtx);
+  }
+  im.instanceMatrix.needsUpdate=true;
+  scene.add(im);
+}
+
+// ===== 1b. 夜景ドレスアップ =====
+const eastA=new THREE.Vector3().crossVectors(new THREE.Vector3(0,0,1),UP).normalize();
+const northA=new THREE.Vector3().crossVectors(UP,eastA).normalize();
+let night=true;
+
+let _facMat=null;
+function facadeMat(){
+  if(_facMat) return _facMat;
+  const c=document.createElement('canvas'); c.width=128; c.height=256;
+  const x=c.getContext('2d');
+  x.fillStyle='#1b1f27'; x.fillRect(0,0,128,256);
+  for(let iy=0;iy<14;iy++)for(let ix=0;ix<6;ix++){
+    const lit=Math.random()<0.45;
+    x.fillStyle=lit?(Math.random()<0.7?'#ffd27a':'#bfe3ff'):'#0e1118';
+    x.fillRect(6+ix*20,8+iy*17,12,10);
+  }
+  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace;
+  _facMat=new THREE.MeshStandardMaterial({map:tex,emissiveMap:tex,emissive:0xffc98a,emissiveIntensity:0.6,roughness:.9});
+  return _facMat;
+}
+
+// 星・月
+const starGeo=new THREE.BufferGeometry();
+{ const n=700, arr=new Float32Array(n*3), v=new THREE.Vector3();
+  for(let i=0;i<n;i++){ v.randomDirection().multiplyScalar(60000).add(ORIGIN); arr[i*3]=v.x; arr[i*3+1]=v.y; arr[i*3+2]=v.z; }
+  starGeo.setAttribute('position',new THREE.BufferAttribute(arr,3)); }
+const stars=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xbcd0ff,size:1.6,sizeAttenuation:false,fog:false,transparent:true,opacity:.9}));
+stars.frustumCulled=false; scene.add(stars);
+const moon=new THREE.Mesh(new THREE.CircleGeometry(1500,32),new THREE.MeshBasicMaterial({color:0xdfe8ff,fog:false}));
+moon.position.copy(ORIGIN).addScaledVector(eastA,35000).addScaledVector(UP,22000);
+moon.lookAt(ORIGIN); moon.frustumCulled=false; scene.add(moon);
+
+// ネオン看板 (四条通沿い)
+function neonTex(text,color){
+  const c=document.createElement('canvas'); c.width=256; c.height=512;
+  const x=c.getContext('2d');
+  x.fillStyle='#07070f'; x.fillRect(0,0,256,512);
+  x.strokeStyle=color; x.lineWidth=6; x.shadowColor=color; x.shadowBlur=25;
+  x.strokeRect(14,14,228,484);
+  x.fillStyle='#fff'; x.font='bold 84px sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+  const chs=[...text], n=chs.length;
+  chs.forEach((ch,i)=>x.fillText(ch,128,n>1?90+340*i/(n-1):256));
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const NEON=[['KYOTO','#ff2fb3'],['四条','#22e6ff'],['ラーメン','#ffb02e'],['HOTEL','#ff4040'],['カラオケ','#7cff4f'],['京都','#ff2fb3'],['SPIDER','#22e6ff'],['ネオン','#ffb02e']];
+const poleM=new THREE.MeshStandardMaterial({color:0x14161c,roughness:.8});
+NEON.forEach((e,i)=>{
+  const s=i%2?1:-1, along=-560+i*160;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(9,18),
+    new THREE.MeshBasicMaterial({map:neonTex(e[0],e[1]),side:THREE.DoubleSide,toneMapped:false}));
+  m.position.copy(ORIGIN).addScaledVector(eastA,s*22).addScaledVector(northA,along).addScaledVector(UP,20);
+  m.up.copy(UP); m.lookAt(m.position.clone().addScaledVector(eastA,-s));
+  scene.add(m);
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,20,6),poleM);
+  pole.position.copy(m.position).addScaledVector(UP,-14);
+  pole.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),UP);
+  scene.add(pole);
+});
+
+// 街灯
+const lampHeadM=new THREE.MeshBasicMaterial({color:0xffd9a0,toneMapped:false});
+const poolM=new THREE.MeshBasicMaterial({color:0xffca7a,transparent:true,opacity:0.22,blending:THREE.AdditiveBlending,depthWrite:false});
+// 街灯 (InstancedMeshで3ドローコールに集約)
+const lampPoleGeo=new THREE.CylinderGeometry(0.22,0.28,9,5);
+const lampHeadGeo=new THREE.SphereGeometry(0.4,8,6);
+const lampPoolGeo=new THREE.CircleGeometry(7,16);
+{
+  const lampBases=[];
+  for(let a=-1300;a<=1300;a+=130)for(const s of [-1,1]){
+    lampBases.push(ORIGIN.clone().addScaledVector(eastA,s*13).addScaledVector(northA,a));
+  }
+  const n=lampBases.length;
+  const poleQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),UP);
+  const poolQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),UP);
+  const poles=new THREE.InstancedMesh(lampPoleGeo,poleM,n);
+  const heads=new THREE.InstancedMesh(lampHeadGeo,lampHeadM,n);
+  const pools=new THREE.InstancedMesh(lampPoolGeo,poolM,n);
+  const mtx=new THREE.Matrix4(), one=new THREE.Vector3(1,1,1), pv=new THREE.Vector3();
+  for(let i=0;i<n;i++){
+    const b=lampBases[i];
+    mtx.compose(pv.copy(b).addScaledVector(UP,4.5),poleQ,one); poles.setMatrixAt(i,mtx);
+    mtx.compose(pv.copy(b).addScaledVector(UP,9.2),new THREE.Quaternion(),one); heads.setMatrixAt(i,mtx);
+    mtx.compose(pv.copy(b).addScaledVector(UP,0.4),poolQ,one); pools.setMatrixAt(i,mtx);
+  }
+  scene.add(poles,heads,pools);
+}
+
+// 車 (ヘッドライト+テールランプ)
+const cars=[];
+const carCols=[0x18202c,0x3a3f4a,0x5a0f16,0x0f3a5a];
+const CAR_N = LITE?6:12;
+for(let i=0;i<CAR_N;i++){
+  const g=new THREE.Group();
+  const dir=i%2?1:-1, lane=(i%3-1)*4.5+dir*5;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2,1.4,4.6),
+    new THREE.MeshStandardMaterial({color:carCols[i%4],roughness:.4,metalness:.4}));
+  body.position.y=0.9; g.add(body);
+  const hl=new THREE.MeshBasicMaterial({color:0xf4fbff,toneMapped:false});
+  const tl=new THREE.MeshBasicMaterial({color:0xff2a2a,toneMapped:false});
+  for(const s of [-0.6,0.6]){
+    const h=new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.35),hl); h.position.set(s,0.9,2.32); g.add(h);
+    const t=new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.35),tl); t.position.set(s,0.9,-2.32); t.rotation.y=Math.PI; g.add(t);
+  }
+  g.position.copy(ORIGIN).addScaledVector(eastA,lane).addScaledVector(northA,-1300+Math.random()*2600).addScaledVector(UP,0.2);
+  g.up.copy(UP); g.lookAt(g.position.clone().addScaledVector(northA,dir));
+  scene.add(g);
+  cars.push({g,dir,speed:9+Math.random()*8});
+}
+
+// 風パーティクル (速度で可視化)
+const WIND_N=LITE?120:350;
+const windGeo=new THREE.BufferGeometry();
+{ const arr=new Float32Array(WIND_N*3), c0=ORIGIN.clone().addScaledVector(UP,130);
+  for(let i=0;i<WIND_N;i++){ arr[i*3]=c0.x+(Math.random()-0.5)*90; arr[i*3+1]=c0.y+(Math.random()-0.5)*90; arr[i*3+2]=c0.z+(Math.random()-0.5)*90; }
+  windGeo.setAttribute('position',new THREE.BufferAttribute(arr,3)); }
+const wind=new THREE.Points(windGeo,new THREE.PointsMaterial({color:0xcfe6ff,size:0.55,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
+wind.frustumCulled=false; scene.add(wind);
+
+const _t1=new THREE.Vector3(), _sh=new THREE.Vector3(), _camDummy=new THREE.Vector3();
+const speedEl=document.getElementById('speed');
+const statEl=document.getElementById('stat');
+const crossEl=document.getElementById('cross');
+let hudT=0, hudSpeed=-1, hudAlt=-1, hudRope=-1, hudAttach=null, hudOpacity=-1;
+function updateStreet(dt){
+  for(const c of cars){
+    c.g.position.addScaledVector(northA,c.dir*c.speed*dt);
+    _t1.copy(c.g.position).sub(ORIGIN);
+    const along=_t1.dot(northA);
+    if(along>1350||along<-1350) c.g.position.addScaledVector(northA,-Math.sign(along)*2700);
+  }
+  const sp=P.vel.length(), wm=wind.material;
+  if((!started&&!window.__started)||sp<8){ wm.opacity=Math.max(0,wm.opacity-dt*2); return; }
+  wm.opacity=Math.min(0.7,(sp-8)/50);
+  const f0=viewDir(), arr=windGeo.attributes.position.array;
+  _t1.copy(P.vel).multiplyScalar(dt*0.9);  for(let i=0;i<WIND_N;i++){
+    const j=i*3;
+    arr[j]-=_t1.x; arr[j+1]-=_t1.y; arr[j+2]-=_t1.z;
+    const dx=arr[j]-P.pos.x, dy=arr[j+1]-P.pos.y, dz=arr[j+2]-P.pos.z;
+    if(dx*dx+dy*dy+dz*dz>45*45){
+      const r=15+Math.random()*25;
+      arr[j]=P.pos.x+f0.x*r+(Math.random()-0.5)*30;
+      arr[j+1]=P.pos.y+f0.y*r+(Math.random()-0.5)*30;
+      arr[j+2]=P.pos.z+f0.z*r+(Math.random()-0.5)*30;
+    }
+  }
+  windGeo.attributes.position.needsUpdate=true;
+}
+
+function applyMode(){
+  scene.background.set(night?0x060a18:0x87ceeb);
+  scene.fog.color.set(night?0x060a18:0x87ceeb);
+  hemi.intensity=night?0.5:1.3; sun.intensity=night?0.7:1.6;
+  sun.color.set(night?0x8fb0ff:0xffffff);
+  stars.visible=night; moon.visible=night;
+  ground.material.color.set(night?0x14171e:0x2f3336);
+}
+applyMode();
+
+// ===== 2. プレイヤー + スイング物理 =====
+const SPAWN = lonLatToEcef(34.9965, 135.7585, 130); // 四条烏丸上空
+const P = { pos:SPAWN.clone(), vel:new THREE.Vector3(), attached:false, anchor:new THREE.Vector3(), ropeLen:0 };
+const GRAV=26, MAX_ROPE=260, MIN_H=2;
+const ray = new THREE.Raycaster(); ray.far=800;
+if('firstHitOnly' in ray) ray.firstHitOnly = true;
+
+const suitM=new THREE.MeshStandardMaterial({color:0x7d0d1d,roughness:.55,metalness:.1});
+const darkM=new THREE.MeshStandardMaterial({color:0x15151c,roughness:.6});
+const eyeM=new THREE.MeshBasicMaterial({color:0xf2f6ff});
+function limb(r,len,mat){
+  const g=new THREE.Group();
+  const m=new THREE.Mesh(new THREE.CapsuleGeometry(r,len,4,8),mat);
+  m.position.y=-(len/2+r);
+  g.add(m); return g;
+}
+const hero=new THREE.Group(); hero.up.copy(UP);
+const torsoH=new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.62,4,8),suitM);
+torsoH.position.y=0.55; hero.add(torsoH);
+const headH=new THREE.Mesh(new THREE.SphereGeometry(0.26,12,8),darkM);
+headH.position.y=1.28; hero.add(headH);
+for(const s of [-1,1]){
+  const eye=new THREE.Mesh(new THREE.SphereGeometry(0.09,10,8),eyeM);
+  eye.scale.set(1,1.4,0.5); eye.position.set(s*0.11,1.32,0.21); hero.add(eye);
+}
+const armR=new THREE.Group(), armL=new THREE.Group();
+armR.position.set(0.44,0.98,0); armL.position.set(-0.44,0.98,0);
+armR.add(limb(0.11,0.5,suitM)); armL.add(limb(0.11,0.5,suitM));
+hero.add(armR,armL);
+const legR=new THREE.Group(), legL=new THREE.Group();
+legR.position.set(0.17,0.12,0); legL.position.set(-0.17,0.12,0);
+legR.add(limb(0.13,0.55,darkM)); legL.add(limb(0.13,0.55,darkM));
+hero.add(legR,legL);
+scene.add(hero);
+function poseHero(mode){
+  if(mode==='swing'){ armR.rotation.set(-2.25,0,-0.15); armL.rotation.set(0.9,0,0.9); legR.rotation.set(0.55,0,0.12); legL.rotation.set(0.75,0,-0.12); }
+  else if(mode==='dive'){ armR.rotation.set(1.5,0,-0.25); armL.rotation.set(1.5,0,0.25); legR.rotation.set(0.15,0,0.05); legL.rotation.set(0.15,0,-0.05); }
+  else { armR.rotation.set(0.3,0,-1.15); armL.rotation.set(0.3,0,1.15); legR.rotation.set(0.35,0,0.18); legL.rotation.set(0.45,0,-0.18); }
+}
+poseHero('cruise');
+const ropeLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([P.pos,P.pos]), new THREE.LineBasicMaterial({color:0xffffff}));
+ropeLine.visible=false; scene.add(ropeLine);
+const anchorBall = new THREE.Mesh(new THREE.SphereGeometry(1.8,14,14), new THREE.MeshBasicMaterial({color:0xff3344}));
+anchorBall.visible=false; scene.add(anchorBall);
+
+// 視点 yaw/pitch (ポインターロックで操作)
+let yaw=Math.PI, pitch=-0.15;
+let holdReel=false, holdTimer=0, autoMode=true, autoTimer=0;
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true; if(e.code==='Space'){ if(!e.repeat){holdReel=true; holdTimer=0; shoot();} e.preventDefault();} if(e.code==='KeyR')respawn(); if(e.code==='KeyN'){night=!night;applyMode();} if(e.code==='KeyM'){autoMode=!autoMode;}});
+addEventListener('keyup',e=>{keys[e.code]=false; if(e.code==='Space'){holdReel=false; detach();}});
+addEventListener('contextmenu',e=>e.preventDefault());
+
+function viewDir(){
+  const east=new THREE.Vector3().crossVectors(new THREE.Vector3(0,0,1),UP).normalize();
+  const north=new THREE.Vector3().crossVectors(UP,east).normalize();
+  return north.clone().multiplyScalar(Math.cos(pitch)*Math.cos(yaw))
+    .addScaledVector(east, Math.cos(pitch)*Math.sin(yaw))
+    .addScaledVector(UP, Math.sin(pitch)).normalize();
+}
+function tryAttach(h){
+  if(!h) return false;
+  const upDist = h.point.clone().sub(P.pos).dot(UP);
+  if(h.distance < MAX_ROPE && upDist > 3){
+    P.attached=true; P.anchor.copy(h.point); P.ropeLen=Math.min(h.distance,MAX_ROPE);
+    anchorBall.visible=true; anchorBall.position.copy(h.point);
+    ropeLine.visible=true;
+    return true;
+  }
+  return false;
+}
+function nearestHit(){
+  let h = null;
+  for(const t of tilesList){
+    const hits = ray.intersectObject(t.group, true);
+    if(hits.length && (!h || hits[0].distance < h.distance)) h = hits[0];
+  }
+  if(!h){
+    // フォールバック街や地面にも引っ掛けられるように全シーンで再試行
+    const hits2 = ray.intersectObjects(scene.children.filter(o=>o!==ropeLine&&o!==anchorBall&&o!==hero), true);
+    if(hits2.length) h = hits2[0];
+  }
+  return h;
+}
+function shoot(){
+  ray.setFromCamera(new THREE.Vector2(0,0), camera);
+  tryAttach(nearestHit());
+}
+function autoShoot(fwd){
+  _t1.copy(P.pos).addScaledVector(fwd,60).addScaledVector(UP,30);
+  ray.set(P.pos,_t1.sub(P.pos).normalize());
+  tryAttach(nearestHit());
+}
+function detach(boost=1.6){
+  if(!P.attached) return;
+  P.attached=false; anchorBall.visible=false; ropeLine.visible=false;
+  P.vel.multiplyScalar(boost).addScaledVector(UP,12);
+}
+function respawn(){ P.pos.copy(SPAWN); P.vel.set(0,0,0); detach(); P.attached=false; ropeLine.visible=false; anchorBall.visible=false; }
+addEventListener('pointerdown',e=>{ if((!started&&!window.__started)||e.target.closest('#card'))return; if(e.button===2){detach();} else if(e.button===0){ holdReel=true; holdTimer=0; shoot(); } });
+addEventListener('pointerup',e=>{ if(e.button===0){ holdReel=false; detach(); } });
+// タッチ: 長押し=糸+加速、離す=ジャンプ、ドラッグ=視点
+let lastTX=0;
+addEventListener('touchstart',e=>{ if(!started&&!window.__started) return; holdReel=true; holdTimer=0; shoot(); lastTX=e.touches[0].clientX; },{passive:true});
+addEventListener('touchmove',e=>{ if(!started&&!window.__started) return; const x=e.touches[0].clientX; yaw-=(x-lastTX)*0.005; lastTX=x; },{passive:true});
+addEventListener('touchend',()=>{ holdReel=false; detach(); });
+addEventListener('mousemove',e=>{
+  if(!document.pointerLockElement) return;
+  yaw -= e.movementX*0.0022; pitch -= e.movementY*0.0022;
+  pitch = THREE.MathUtils.clamp(pitch,-1.2,1.2);
+});
+
+function stepPlayer(dt){
+  const fwd = viewDir();
+  const sp = P.vel.length();
+  P.vel.addScaledVector(UP,-GRAV*dt);
+  P.vel.multiplyScalar(Math.max(0,1-0.04*dt));
+  const right=new THREE.Vector3().crossVectors(fwd,UP).normalize();
+  if(P.attached && keys['KeyW']) P.ropeLen=Math.max(12,P.ropeLen-16*dt);
+  if(P.attached && keys['KeyS']) P.ropeLen=Math.min(MAX_ROPE,P.ropeLen+16*dt);
+  if(keys['KeyW']&&!P.attached) P.vel.addScaledVector(fwd,60*dt);
+  if(keys['KeyS']&&!P.attached) P.vel.addScaledVector(fwd,-10*dt);
+  if(keys['KeyA']) P.vel.addScaledVector(right,-40*dt);
+  if(keys['KeyD']) P.vel.addScaledVector(right,40*dt);
+  if(!P.attached && fwd.dot(UP) < -0.25) P.vel.addScaledVector(fwd,(keys['KeyW']?90:20)*dt); // ダイブ加速
+  P.pos.addScaledVector(P.vel,dt);
+  const hAbove=P.pos.clone().sub(ORIGIN).dot(UP);
+
+  // 長押し=巻取り / オート=勝手に糸を掛け直す
+  if(holdReel){
+    if(P.attached) P.ropeLen=Math.max(10,P.ropeLen-30*dt);
+    else { holdTimer-=dt; if(holdTimer<=0){ holdTimer=0.15; shoot(); } }
+  }
+  autoTimer-=dt;
+  if(autoMode && !P.attached && !holdReel && hAbove>8 && sp>4 && autoTimer<=0){ autoTimer=0.4; autoShoot(fwd); }
+
+  if(P.attached){
+    const d=P.pos.clone().sub(P.anchor); const dist=d.length();
+    if(dist>P.ropeLen){
+      const n=d.divideScalar(dist||1);
+      P.pos.copy(P.anchor).addScaledVector(n,P.ropeLen);
+      const vOut=P.vel.dot(n);
+      if(vOut>0) P.vel.addScaledVector(n,-vOut);
+      P.vel.addScaledVector(fwd,22*dt); // ポンプ加速
+    }
+    if(P.pos.distanceTo(P.anchor)>MAX_ROPE*1.2) detach(1);
+  }
+  if(hAbove<MIN_H){ P.pos.addScaledVector(UP,MIN_H-hAbove);
+    const vUp=P.vel.dot(UP); if(vUp<0)P.vel.addScaledVector(UP,-vUp*1.6); P.vel.multiplyScalar(0.96); }
+  // ヒーロー向き・ポーズ
+  hero.position.copy(P.pos);
+  if(sp>2){ _t1.copy(P.pos).add(P.vel); hero.lookAt(_t1); }
+  poseHero(P.attached?'swing':(sp>20&&fwd.dot(UP)<-0.25)?'dive':'cruise');
+  if(P.attached){ _t1.copy(P.pos).addScaledVector(UP,1.15); ropeLine.geometry.setFromPoints([_t1,P.anchor]); }
+
+  // カメラ追従 + FOV演出 + 振動
+  const want=P.pos.clone().addScaledVector(fwd,-7).addScaledVector(UP,3);
+  camera.position.lerp(want,1-Math.pow(0.0005,dt));
+  _sh.copy(P.pos).addScaledVector(fwd,14).addScaledVector(P.vel,0.2);
+  const shk=Math.min(1,sp/55)*0.4;
+  if(shk>0.01){ _sh.addScaledVector(right,(Math.random()-0.5)*shk).addScaledVector(UP,(Math.random()-0.5)*shk); }
+  camera.lookAt(_sh);
+  const tFov=THREE.MathUtils.clamp(62+sp*0.7,62,100);
+  camera.fov+=(tFov-camera.fov)*Math.min(1,dt*4); camera.updateProjectionMatrix();
+  // HUD + 照準色 (0.25秒間隔で更新)
+  hudT-=dt;
+  if(hudT<=0){
+    hudT=0.25;
+    const kmh=Math.round(sp*3.6);
+    const op=THREE.MathUtils.clamp((sp-16)/45,0,0.85);
+    speedEl.style.opacity=op.toFixed(2);
+    if(kmh!==hudSpeed||Math.round(hAbove)!==hudAlt||P.attached!==hudAttach||(P.attached&&Math.round(P.ropeLen)!==hudRope)){
+      hudSpeed=kmh; hudAlt=Math.round(hAbove); hudAttach=P.attached; hudRope=P.attached?Math.round(P.ropeLen):-1;
+      statEl.textContent=`速度 ${kmh}km/h 高度 ${hudAlt}m ${P.attached?('ロープ '+hudRope+'m'):'送電線なし — ビルを狙ってクリック'}`;
+      crossEl.className=P.attached?'ok':'';
+    }
+  }
+}
+
+// 照準アシスト: 中央にビルがあれば照準を赤く
+let started=false;
+function hideStartHint(){}
+document.getElementById('go').onclick=()=>{
+  document.getElementById('start').style.display='none';
+  started=true; window.__started=true; renderer.domElement.requestPointerLock?.();
+  camera.position.copy(P.pos.clone().addScaledVector(viewDir(),-10).addScaledVector(UP,4));
+};
+renderer.domElement.addEventListener('click',()=>{ if(started) renderer.domElement.requestPointerLock?.(); });
+
+const clock=new THREE.Clock();
+(function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(clock.getDelta(),0.05);
+  for(const t of tilesList){
+    t.setCamera(camera); t.setResolutionFromRenderer(camera,renderer);
+    camera.updateMatrixWorld(); t.update();
+  }
+  if(started||window.__started) stepPlayer(dt);
+  else { // 開始前は京都駅をゆっくり周回
+    const t=performance.now()*0.0001;
+    camera.position.copy(lonLatToEcef(34.99+t*0.002%0.02,135.758,300));
+    camera.lookAt(lonLatToEcef(34.994,135.758,50));
+  }
+  updateStreet(dt);
+  // 照準チェック (1秒に5回だけ)
+  renderer.render(scene,camera);
+})();
+</script>
+</body>
+</html>
