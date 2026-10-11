@@ -1,0 +1,28 @@
+{
+  "name": "kyoto-ninja",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild src/main.js --bundle --format=iife --minify --outfile=dist/game.js",
+    "serve": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
+    "3d-tiles-renderer": "^0.5.3",
+    "esbuild": "^0.28.2",
+    "pbf": "^5.1.2",
+    "three": "^0.170.0",
+    "three-mesh-bvh": "^0.9.16"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}
