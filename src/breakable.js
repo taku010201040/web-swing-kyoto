@@ -4,7 +4,23 @@ import * as THREE from 'three';
 // 建築年は PLATEAU の建物属性 bldg:yearOfConstruction（3D Tiles のバッチテーブル）をそのまま使う。
 // 1980年以前＝1981年の新耐震基準より前に建った建物を対象にする。値が 1 などの建物は「不明」として壊れない。
 export const OLD_YEAR = 1980;
-const YEAR_KEY = 'bldg:yearOfConstruction', ID_KEY = 'gml_id';
+const YEAR_KEY = 'bldg:yearOfConstruction', ID_KEY = 'gml_id', USAGE_KEY = 'bldg:usage';
+
+// 建物用途（PLATEAU の属性 bldg:usage）。人が住んでいる建物は「住まい」として扱い、崩すとタイムに罰が付く。
+export const HOME_PENALTY = 5; // 秒
+const USAGE_GROUPS = [
+  ['住まい', ['住宅', '共同住宅', '店舗等併用住宅', '店舗等併用共同住宅', '作業所併用住宅']],
+  ['商業', ['商業施設', '商業系複合施設']],
+  ['業務・官公庁', ['業務施設', '官公庁施設']],
+  ['宿泊', ['宿泊施設']],
+  ['文教厚生', ['文教厚生施設']],
+  ['工場・倉庫', ['工場', '運輸倉庫施設', '供給処理施設']],
+];
+export function usageGroup(usage) {
+  if (!usage || usage === '不明') return null;
+  const g = USAGE_GROUPS.find(([, list]) => list.includes(usage));
+  return g ? g[0] : 'その他';
+}
 
 const broken = new Map();   // gml_id → 建築年
 const records = [];         // 潰した頂点の記録（やり直し時に元へ戻す）
@@ -31,7 +47,8 @@ export function infoAt(hit) {
   const bid = attr.getX(hit.face.a);
   const y = prop(bt, YEAR_KEY)?.[bid], id = prop(bt, ID_KEY)?.[bid];
   const year = y >= 1000 ? y : null;
-  return { mesh, bid, id, year, fragile: year !== null && year <= OLD_YEAR, gone: !!mesh.userData.gone?.has(bid) };
+  const u = prop(bt, USAGE_KEY)?.[bid], usage = u && u !== '不明' ? String(u) : null, group = usageGroup(usage);
+  return { mesh, bid, id, year, usage, group, home: group === '住まい', fragile: year !== null && year <= OLD_YEAR, gone: !!mesh.userData.gone?.has(bid) };
 }
 export const isGone = (hit) => {
   const g = hit.object.userData.gone, a = hit.object.geometry.attributes._batchid;

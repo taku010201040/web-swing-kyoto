@@ -8,7 +8,7 @@ import { makeFrame } from './geo.js';
 import { createGround, fetchMvt } from './ground.js';
 import { createTerrain } from './terrain.js';
 import { TA, fmt, fmtDiff, ping, join, setSolo, recordLocal, submit, boardsHtml } from './timeattack.js';
-import { OLD_YEAR, infoAt, isGone, breakBuilding, applyBroken, updateBreaks, restoreAll, brokenCount, createDust } from './breakable.js';
+import { OLD_YEAR, HOME_PENALTY, infoAt, isGone, breakBuilding, applyBroken, updateBreaks, restoreAll, brokenCount, createDust } from './breakable.js';
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
@@ -243,7 +243,7 @@ const S = {
   wi: 1, cp: 0,             // 次の目的地 / 直前の通過地点
   time: 0, started: false, swings: 0, maxSpeed: 0, dist: 0,
   towerTop: 131, towerMeasured: false,
-  tut: 0, trail: [], trailT: 0, goalT: 0, camDist: CAM_DIST, fp: false, aimInfo: null, broken: 0, airJumps: 0, countT: 0, splits: [],
+  tut: 0, trail: [], trailT: 0, goalT: 0, camDist: CAM_DIST, fp: false, aimInfo: null, broken: 0, homesBroken: 0, usage: {}, airJumps: 0, countT: 0, splits: [],
   face: Math.PI / 2, stuckT: 0, blockT: 0, tip: '', tipT: 0,
 };
 const keys = {};
@@ -263,7 +263,7 @@ function spawnAt(i) {
   S.pitch = 0.12;
 }
 function resetRun() {
-  restoreAll(); S.broken = 0; // 壊した建物を元に戻す
+  restoreAll(); S.broken = 0; S.homesBroken = 0; S.usage = {}; // 壊した建物を元に戻す
   Object.assign(S, { countT: 3, splits: [], wi: 1, cp: 0, time: 0, started: false, swings: 0, maxSpeed: 0, dist: 0, tut: 0, trail: [], goalT: 0, mode: 'play' });
   if (trailMesh) { scene.remove(trailMesh); trailMesh.geometry.dispose(); trailMesh = null; }
   $('goal').style.display = 'none';
@@ -385,7 +385,10 @@ function updateHud(dt) {
   $('reticle').className = 'hud ' + (S.rope ? 'on' : S.aim ? 'ok' : '');
   const ai = !S.rope && S.aim ? S.aimInfo : null, aiEl = $('aiminfo');
   if (ai && ai.fragile && isProtected(S.aim)) ai.fragile = false;
-  const aiText = !ai || !ai.year ? '' : ai.fragile ? `築${ai.year}年・もろい（勢いよく突っ込むと崩れる）` : `築${ai.year}年`;
+  // 狙った建物の築年と用途（どちらも PLATEAU の属性）。住まいを崩すとタイムに罰が付くことも知らせる
+  const aiParts = ai ? [ai.year ? `築${ai.year}年` : '', ai.usage || ''].filter(Boolean) : [];
+  if (ai && ai.fragile) aiParts.push(ai.home ? `もろい（住まいなので崩すと+${HOME_PENALTY}秒）` : 'もろい（勢いよく突っ込むと崩れる）');
+  const aiText = aiParts.join('・');
   if (aiEl.textContent !== aiText) { aiEl.textContent = aiText; aiEl.className = 'hud' + (ai && ai.fragile ? ' old' : ''); }
   let hint = TUT[S.tut];
   S.blockT = (keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD) && !S.rope && sp < 2 ? S.blockT + dt : 0;
@@ -435,6 +438,7 @@ function attach() {
   S.airJumps = 0;
   if (S.grounded) { S.vel.y = Math.max(S.vel.y, 9); S.grounded = false; }
   S.swings++;
+  if (S.aimInfo && S.aimInfo.group) S.usage[S.aimInfo.group] = (S.usage[S.aimInfo.group] || 0) + 1; // どんな用途の建物を伝って来たか
   beep(900, 300, 0.12, 'sawtooth', 0.06); setTimeout(() => beep(220, 180, 0.08, 'square', 0.07), 90);
   if (S.tut === 1) S.tut = 2;
   if (S.tut === 3 && S.swings >= 4) S.tut = 4;
@@ -534,7 +538,8 @@ function step(dt) {
       S.pos.add(_move); v.multiplyScalar(0.8);
       S.broken = brokenCount();
       dust.burst(h.point); dust.burst(_o.copy(h.point).addScaledVector(_dir, 6));
-      toast(`築${hit.year}年の建物が崩れた`);
+      if (hit.home) { S.homesBroken++; S.time += HOME_PENALTY; toast(`${hit.usage}（築${hit.year}年）を崩した　+${HOME_PENALTY}秒`); }
+      else toast(`築${hit.year}年の${hit.usage || '建物'}が崩れた`);
       beep(110, 40, 0.5, 'sawtooth', 0.12); beep(70, 30, 0.7, 'square', 0.08);
       if (S.rope && S.rope.gid === hit.id) release(false);
     } else if (h) {
@@ -614,7 +619,7 @@ function finish() {
   submit({ time, broken: S.broken, swings: S.swings }).then((r) => { if (r) $('boards').innerHTML = boardsHtml(); })
     .catch((e) => { $('boards').innerHTML = `<p class="bad">チームへの送信に失敗：${e.message}</p>`; });
   $('result').innerHTML = `<tr><td>タイム</td><td><b class="big">${fmt(time)}</b><br>${pb}</td></tr><tr><td>駆け抜けた距離</td><td>${(S.dist / 1000).toFixed(2)} km</td></tr>` +
-    `<tr><td>鉤縄の掛け替え</td><td>${S.swings} 回</td></tr><tr><td>崩した古い建物</td><td>${S.broken} 棟（${OLD_YEAR}年以前の築）</td></tr><tr><td>最高速度</td><td>${Math.round(S.maxSpeed * 3.6)} km/h</td></tr>` +
+    `<tr><td>鉤縄の掛け替え</td><td>${S.swings} 回</td></tr><tr><td>崩した古い建物</td><td>${S.broken} 棟（${OLD_YEAR}年以前の築）${S.homesBroken ? `<br>うち住まい ${S.homesBroken} 棟（+${S.homesBroken * HOME_PENALTY}秒）` : ''}</td></tr><tr><td>伝ってきた建物の用途</td><td>${Object.entries(S.usage).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${k} ${n}`).join('、') || '—'}</td></tr><tr><td>最高速度</td><td>${Math.round(S.maxSpeed * 3.6)} km/h</td></tr>` +
     `<tr><td>京都タワーの高さ</td><td>地上 約${Math.round(S.towerTop - groundY(0, 0))} m（PLATEAU の建物データより）</td></tr>`;
   $('goal').style.display = 'block';
   // 通ってきた道
