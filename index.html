@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>KAGINAWA ― 忍者、京都の空を翔る | KYOTO PLATEAU HACK 2026</title>
+    <style>
+      :root {
+        --red: #d23a42;
+        --gold: #ffd24a;
+        --ink: #0a0c14;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ink);
+        font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+        color: #eef1f7;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      canvas { display: block; }
+      .hidden { display: none !important; }
+
+      #speed-fx {
+        position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 4;
+        background:
+          radial-gradient(ellipse at center, transparent 46%, rgba(10,12,20,.55) 100%),
+          repeating-conic-gradient(from 0deg at 50% 50%, transparent 0 2.6deg, rgba(255,255,255,.10) 2.6deg 3.4deg);
+        -webkit-mask-image: radial-gradient(circle, transparent 44%, black 82%);
+        mask-image: radial-gradient(circle, transparent 44%, black 82%);
+        transition: opacity .12s linear;
+      }
+
+      #hud {
+        position: fixed; inset: 0; pointer-events: none; z-index: 5;
+        padding: 14px 18px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto 1fr auto;
+        gap: 8px;
+      }
+      #hud .panel {
+        background: rgba(8, 10, 18, .62);
+        border: 1px solid rgba(255, 210, 74, .25);
+        border-radius: 12px;
+        padding: 10px 14px;
+        backdrop-filter: blur(6px);
+      }
+      #hud-left { display: flex; flex-direction: column; gap: 8px; }
+      #hud-right { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; text-align: right; }
+      .hud-row { display: flex; align-items: baseline; gap: 10px; }
+      .hud-label { font-size: 11px; opacity: .72; letter-spacing: .08em; }
+      #hud-speed { font-size: 44px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+      #hud-speed-unit { font-size: 13px; opacity: .8; }
+      #hud-alt, #hud-time, #hud-coins, #hud-combo, #hud-falls { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      #hud-next { font-size: 16px; font-weight: 700; color: var(--gold); }
+      #hud-next-dist { font-size: 12px; opacity: .8; }
+      #dash-wrap { width: 132px; height: 6px; background: rgba(255,255,255,.14); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+      #dash-cd { height: 100%; background: linear-gradient(90deg, var(--red), var(--gold)); width: 100%; }
+      #hud-bottom {
+        grid-column: 1 / -1; grid-row: 3; display: flex; justify-content: center; align-items: flex-end;
+      }
+      #hud-keys {
+        font-size: 12px; opacity: .78; background: rgba(8,10,18,.5); padding: 6px 14px; border-radius: 20px;
+      }
+      kbd {
+        background: rgba(255,255,255,.14); border-radius: 4px; padding: 1px 6px; margin: 0 2px;
+        font-family: inherit; font-size: 11px;
+      }
+      #banner {
+        position: fixed; left: 50%; top: 22%; transform: translate(-50%, 0);
+        font-size: 34px; font-weight: 900; letter-spacing: .04em;
+        text-shadow: 0 4px 24px rgba(0,0,0,.8), 0 0 18px rgba(255,210,74,.35);
+        pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 6;
+      }
+      #banner.show { opacity: 1; animation: pop .35s ease-out; }
+      #banner.gold { color: var(--gold); }
+      #banner.danger { color: #ff6b6b; }
+      #banner.cyan { color: #6ee7ff; }
+      @keyframes pop {
+        0% { transform: translate(-50%, 10px) scale(.85); }
+        100% { transform: translate(-50%, 0) scale(1); }
+      }
+
+      #reticle {
+        position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+        width: 26px; height: 26px; pointer-events: none; z-index: 5; opacity: .9;
+      }
+      #reticle::before, #reticle::after {
+        content: ""; position: absolute; background: #fff; box-shadow: 0 0 6px #000;
+      }
+      #reticle::before { left: 12px; top: 0; width: 2px; height: 26px; }
+      #reticle::after { top: 12px; left: 0; height: 2px; width: 26px; }
+      #reticle.ready::before, #reticle.ready::after { background: var(--red); }
+      #reticle.ready { transform: translate(-50%, -50%) scale(1.25); }
+
+      .overlay {
+        position: fixed; inset: 0; z-index: 10;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(5, 6, 12, .82);
+        backdrop-filter: blur(8px);
+      }
+      .card {
+        background: linear-gradient(160deg, #12141f 0%, #0a0c14 100%);
+        border: 1px solid rgba(255, 210, 74, .3);
+        border-radius: 20px;
+        padding: 34px 40px;
+        max-width: 620px;
+        width: min(92vw, 620px);
+        text-align: center;
+        box-shadow: 0 30px 80px rgba(0,0,0,.6);
+      }
+      .card h1 {
+        margin: 0 0 6px; font-size: 40px; letter-spacing: .06em;
+        background: linear-gradient(90deg, #fff, var(--gold), var(--red));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .card h2 { margin: 0 0 4px; font-size: 15px; color: var(--gold); letter-spacing: .14em; font-weight: 700; }
+      .card p { margin: 8px 0; font-size: 14px; line-height: 1.7; opacity: .9; }
+      .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 16px 0; font-size: 13px; text-align: left; }
+      .keys div { background: rgba(255,255,255,.05); border-radius: 8px; padding: 7px 12px; }
+      button {
+        font-family: inherit; font-size: 18px; font-weight: 800; letter-spacing: .05em;
+        padding: 14px 44px; border-radius: 12px; border: 0; cursor: pointer;
+        background: linear-gradient(90deg, var(--red), #ff7a54); color: #fff;
+        box-shadow: 0 8px 30px rgba(210, 58, 66, .35);
+        transition: transform .12s ease;
+      }
+      button:hover { transform: translateY(-2px); }
+      #load-bar { width: 100%; height: 8px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; margin: 16px 0 8px; }
+      #load-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--gold), var(--red)); transition: width .2s; }
+      #load-text { font-size: 12px; opacity: .75; }
+      #plateau-status { font-size: 11px; opacity: .55; margin-top: 14px; }
+      .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0; }
+      .result-grid .cell { background: rgba(255,255,255,.05); border-radius: 12px; padding: 12px; }
+      .result-grid .cell b { display: block; font-size: 26px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+      .result-grid span { font-size: 11px; opacity: .7; }
+      #result-record { font-size: 14px; color: var(--gold); min-height: 20px; font-weight: 700; }
+      @media (max-width: 640px) {
+        #hud-speed { font-size: 34px; }
+        .card h1 { font-size: 30px; }
+        .keys { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="speed-fx"></div>
+
+    <div id="hud" class="hidden">
+      <div id="hud-left">
+        <div class="panel">
+          <div class="hud-row">
+            <span id="hud-speed">0</span><span id="hud-speed-unit">km/h</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">高度</span><span id="hud-alt">0</span><span class="hud-label">m</span>
+            <span class="hud-label" style="margin-left:14px">小判</span><span id="hud-coins">0 / 48</span>
+            <span class="hud-label" style="margin-left:14px">連撃</span><span id="hud-combo">—</span>
+            <span class="hud-label" style="margin-left:14px">転倒</span><span id="hud-falls">0</span>
+          </div>
+          <div id="dash-wrap"><div id="dash-cd"></div></div>
+        </div>
+      </div>
+      <div id="hud-right">
+        <div class="panel">
+          <div class="hud-row" style="justify-content:flex-end">
+            <span class="hud-label">TIME</span><span id="hud-time">0:00.00</span>
+          </div>
+          <div class="hud-row" style="justify-content:flex-end">
+            <span id="hud-next">四条烏丸</span>
+          </div>
+          <div id="hud-next-dist">—</div>
+          <div class="hud-row" style="justify-content:flex-end">
+            <span class="hud-label">BEST</span><span class="hud-label" id="hud-best">--:--.--</span>
+          </div>
+        </div>
+      </div>
+      <div id="hud-bottom"><div id="hud-keys">
+        <kbd>長押し</kbd>鉤爪＋巻取り <kbd>離す</kbd>ジャンプ <kbd>WASD</kbd>移動 <kbd>Shift</kbd>煙玉ダッシュ <kbd>R</kbd>最初から <kbd>N</kbd>昼/夜
+      </div></div>
+    </div>
+
+    <div id="reticle"></div>
+    <div id="banner" class="hidden"></div>
+
+    <div id="ui-loading" class="overlay">
+      <div class="card">
+        <h1>KAGINAWA</h1>
+        <h2>忍 者 、 京 都 の 空 を 翔 る</h2>
+        <div id="load-bar"><div id="load-fill"></div></div>
+        <div id="load-text">PLATEAU 京都市3D都市モデルを読み込み中…</div>
+        <div id="plateau-status">PLATEAU: 接続中…</div>
+      </div>
+    </div>
+
+    <div id="ui-title" class="overlay hidden">
+      <div class="card">
+        <h1>KAGINAWA</h1>
+        <h2>KYOTO PLATEAU HACK 2026 / kph2026-07</h2>
+        <p>
+          国土交通省<b>PLATEAU</b>の京都市3D都市モデル(四条烏丸〜京都駅・LOD2)の実際のビルを、
+          <b>鉤爪(カギナワ)</b>で捉えて振り子移動。<br>
+          <b>四条烏丸から京都駅</b>まで、鳥居をくぐってタイムアタック!
+        </p>
+        <div class="keys">
+          <div>🖱 クリック/スペース <b>長押し</b> … 鉤爪発射 + 巻取り</div>
+          <div>🖱 <b>離す</b> … その場からジャンプ加速</div>
+          <div>🖱 マウス移動 … 視点(ポインターロック)</div>
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> … 旋回・ロープ操作</div>
+          <div><kbd>Shift</kbd> … 煙玉ダッシュ(2秒)</div>
+          <div><kbd>R</kbd> リスタート / <kbd>N</kbd> 昼と夜</div>
+        </div>
+        <p style="font-size:12px;opacity:.7">小判を集めるとスコアアップ。ビルに引っかけて加速が基本。スマホは長押し&ドラッグで操作。</p>
+        <button id="btn-start">任 務 開 始</button>
+        <div id="plateau-status2"></div>
+      </div>
+    </div>
+
+    <div id="ui-result" class="overlay hidden">
+      <div class="card">
+        <h2>任 務 完 了</h2>
+        <div class="result-grid">
+          <div class="cell"><span>TIME</span><b id="result-time">0:00.00</b></div>
+          <div class="cell"><span>SCORE</span><b id="result-score">0</b></div>
+          <div class="cell"><span>小判</span><b id="result-coins">0 / 48</b></div>
+          <div class="cell"><span>STATUS</span><b style="font-size:15px">京都駅 制覇</b></div>
+        </div>
+        <div id="result-record"></div>
+        <button id="btn-retry" style="margin-top:14px">もう一度</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
