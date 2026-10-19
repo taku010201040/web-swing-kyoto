@@ -80,8 +80,9 @@ unity-swing\build-windows.bat … ワンクリックビルド（Unity版）
   - `kph2026-07/nagashi-somen/` 独立版そうめん一式
 - 参考に取り込んだ外部素材: `ecc/`（OSS "ECC" by affaan-m）、`skills/`（PLATEAU公式Agent Skills）
 
-> 注: `kph2026-07/app/` 内の Cesium ion トークンは公開リポジトリのため空文字化してある
-> （実値は非公開チームリポジトリ参照）。
+> 注: `kph2026-07/app/src/ionToken.ts`（Cesium ion トークン）は by-design コミット対象外
+> （`app/.gitignore` 含む）のため、本アーカイブにも含まれない。ローカル実行時は各自
+> `ION_TOKEN` を貼る（空文字のままでも PLATEAU 直配信の建物だけで動作する）。
 
 ## PLATEAU データURL
 

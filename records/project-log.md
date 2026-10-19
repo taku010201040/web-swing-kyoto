@@ -111,9 +111,11 @@ npm install ; npm run dev
 
 ## 5. セキュリティ配慮（公開リポジトリ化にあたって）
 
-- **kph2026-07/app/src ion トークン**: JWT状の実値がソースに直書きされていたため、
-  本公開アーカイブでは `ION_TOKEN = ""` に退避（実値は非公開の kph2026-07 参照）。
-  なお実値は既に非公開チームリポジトリ側には残っている（可能なら rotate 推奨）。
+- **kph2026-07/app/src/ionToken.ts**: Cesium ion の JWT 実値がローカルに存在するが、
+  `app/.gitignore` が `src/ionToken.ts` を by-design 無視する設計のため、
+  **非公開リポジトリ・公開アーカイブのどちらにも一切コミットされていない**
+  （確認済み: `origin/sub/somen-slider` の `app/src` に ionToken.ts は存在しない）。
+  実値はローカルに留まるため rotate 不要。`main.ts` は空文字トークンでも動く。
 - `ecc/`・`skills/`・`.opencode/` 全ファイルを自動スキャン →
   検出された `sk-abc123...` 等は**すべてドキュメント用プレースホルダ**で実害なし。
 - その他の config / .env.example / mcp 設定はプレースホルダのみで実トークンなし。
@@ -140,4 +142,4 @@ npm install ; npm run dev
 1. **Unity ライセンス認証** → `build-windows.bat` の実行検証
 2. ローカル `kph2026-07` の `main` は私の先行コミット2件のまま未同期（本体系ファイルと競合するため放置を推奨。必要なら `git switch sub/somen-slider` で作業）
 3. チーム本リポの `demo/kyoto-ninja-demo.mp4`（約86.9MB）が main に残っている。clone が重くなる（100MB 制限内）ので slim 化要検討
-4. ion トークンの rotate（可能なら）
+4. ion トークン: 未流出確認済み（rotate 不必要。将来的に共有方法を変えるなら再考）
