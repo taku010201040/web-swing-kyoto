@@ -30,11 +30,12 @@ Thumbs.db
 .idea/
 *.tmp
 
-# ===== opencode / agent tool configs (公開対象外) =====
-.opencode/
-ecc/
-skills/
+# ===== opencode / agent tool configs =====
+# 2026-10-19: 全成果物アーカイブ化のため .opencode/ecc/skills/kph2026-07 を取り込み開始
+# （ネストしたリポジトリの .git は除外して中身のファイルのみ追跡）
+**/.git/
+**/.git_archived/
+.opencode/node_modules/
 .claude/
 .codex/
 .cursor/
-kph2026-07

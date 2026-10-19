@@ -69,6 +69,20 @@ START-WEBSWING.bat    … ワンクリック起動（ブラウザ版）
 unity-swing\build-windows.bat … ワンクリックビルド（Unity版）
 ```
 
+## 全記録・アーカイブ
+
+開発経緯・タイムライン・技術メモ・チームリポジトリでのやり取りの全記録は
+**`records/project-log.md`** を参照。
+
+- 会場写真: `records/IMG_1158.jpg`
+- チームリポジトリ(非公開) `plateau-hack/kph2026-07` の自分の作品コピー:
+  - `kph2026-07/app/` 流しそうめんスライダー（そうめん, sub/somen-slider ブランチ由来）
+  - `kph2026-07/nagashi-somen/` 独立版そうめん一式
+- 参考に取り込んだ外部素材: `ecc/`（OSS "ECC" by affaan-m）、`skills/`（PLATEAU公式Agent Skills）
+
+> 注: `kph2026-07/app/` 内の Cesium ion トークンは公開リポジトリのため空文字化してある
+> （実値は非公開チームリポジトリ参照）。
+
 ## PLATEAU データURL
 
 ```
